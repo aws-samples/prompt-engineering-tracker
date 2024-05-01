@@ -152,7 +152,20 @@ class ChainLogCallback(BaseLogCallback):
         self.input_dict[self.current_run_id] = {**self.input_dict[self.current_run_id], **chain_model_kwargs, **model_kwargs,
                     "error": "False"}
 
+    def get_retriever(self, serialized):
+        serialized_str = serialized['repr']
+        pattern = r"retriever=\w+\("
+        match = re.search(pattern, serialized_str)
+        if not match:
+            return "UnknownRetriever"
+        retriever_str_long = match.group()
+        retriever = retriever_str_long.replace("retriever=", "")[:-1]
+        return retriever
+
     def construct_input_dict_ConversationalRetrievalChain(self, serialized, inputs, **kwargs):
+        retriever = self.get_retriever(serialized)
+        self.input_dict_additional_info[self.current_run_id]['retriever'] = retriever
+
         # TODO update this to find prompt template from CRC if not combine_all_actions_into_one_log
         return
 
