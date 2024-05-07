@@ -152,19 +152,42 @@ class ChainLogCallback(BaseLogCallback):
         self.input_dict[self.current_run_id] = {**self.input_dict[self.current_run_id], **chain_model_kwargs, **model_kwargs,
                     "error": "False"}
 
-    def get_retriever(self, serialized):
-        serialized_str = serialized['repr']
-        pattern = r"retriever=\w+\("
+    def get_match(self, serialized_str, pattern, group1=False):
         match = re.search(pattern, serialized_str)
         if not match:
-            return "UnknownRetriever"
-        retriever_str_long = match.group()
+            return None
+        if group1:
+            return match.group(1)
+        return match.group()
+
+    def get_retriever_info(self, serialized):
+        retriever_info = {}
+        serialized_str = serialized['repr']
+        # print(serialized)
+        retriever_str_long = self.get_match(serialized_str, r"retriever=\w+\(")
+        retriever_full = self.get_match(serialized_str, r'retriever=(.+?)\)')
         retriever = retriever_str_long.replace("retriever=", "")[:-1]
-        return retriever
+        retriever_info['retriever'] = retriever
+        if "AmazonKendraRetriever" in retriever_str_long:
+            kendra_index_id = self.get_match(retriever_full, r"index_id='(.+?)'", group1=True)
+            print(kendra_index_id)
+            retriever_info['kendra_index_id'] = kendra_index_id
+        if "VectorStoreRetriever" in retriever_str_long:
+            tags = self.get_match(serialized_str, r"tags=\[(.+?)\]", group1=True)
+            tag_list = eval(tags)
+            print(tags)
+            retriever_info['retriever_db_and_embeddings'] = tags
+            retriever_info['retriever_db'] = tag_list[0]
+            retriever_info['retriever_embeddings'] = tag_list[1]
+        return retriever_info
 
     def construct_input_dict_ConversationalRetrievalChain(self, serialized, inputs, **kwargs):
-        retriever = self.get_retriever(serialized)
-        self.input_dict_additional_info[self.current_run_id]['retriever'] = retriever
+        retriever_info = self.get_retriever_info(serialized)
+        if retriever_info:
+            self.input_dict_additional_info[self.current_run_id]['retriever'] = retriever_info['retriever']
+            self.input_dict[self.current_run_id] = {**self.input_dict[self.current_run_id], 
+                                                   **retriever_info,
+                                                   }
 
         # TODO update this to find prompt template from CRC if not combine_all_actions_into_one_log
         return
