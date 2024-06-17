@@ -6,6 +6,8 @@ csv_files
 *.csv
 */*.csv
 .DS_Store
+.venv/*
+.venv
 
 !/.gitattributes
 !/.projen/tasks.json

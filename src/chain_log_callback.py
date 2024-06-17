@@ -3,15 +3,6 @@
 
 import json
 import re
-from langchain_core.load.serializable import (
-    BaseSerialized,
-    Serializable,
-    SerializedConstructor,
-    SerializedNotImplemented,
-    SerializedSecret,
-    to_json_not_implemented,
-    try_neq_default,
-)
 
 import pandas as pd
 import ast
@@ -170,12 +161,12 @@ class ChainLogCallback(BaseLogCallback):
         retriever_info['retriever'] = retriever
         if "AmazonKendraRetriever" in retriever_str_long:
             kendra_index_id = self.get_match(retriever_full, r"index_id='(.+?)'", group1=True)
-            print(kendra_index_id)
+            # print(kendra_index_id)
             retriever_info['kendra_index_id'] = kendra_index_id
         if "VectorStoreRetriever" in retriever_str_long:
             tags = self.get_match(serialized_str, r"tags=\[(.+?)\]", group1=True)
             tag_list = eval(tags)
-            print(tags)
+            # print(tags)
             retriever_info['retriever_db_and_embeddings'] = tags
             retriever_info['retriever_db'] = tag_list[0]
             retriever_info['retriever_embeddings'] = tag_list[1]
