@@ -115,6 +115,16 @@ class ChainLogCallback(BaseLogCallback):
         self.input_dict_additional_info[self.current_run_id] = {}
         self.input_dict_additional_info[self.current_run_id]['chain_langchain_type'] = serialized["type"]
 
+    def get_prompt_template_from_repr(self, repr):
+        pattern = r'prompt=PromptTemplate\(.*?template="(.*?)"'
+        match = re.search(pattern, repr, re.DOTALL)
+
+        if match:
+            template = match.group(1)
+            return template
+        else:
+            print("Template not found in the input string.")
+            return None
 
 
     def construct_input_dict_ConversationChain(self, serialized, inputs, **kwargs):
@@ -122,23 +132,35 @@ class ChainLogCallback(BaseLogCallback):
         This extracts the prompt template and other inputs from the ConversationChain. 
         The way this is done for the ConversationChain is different than for other chains which is why the functions are separate.
         """
-        self.input_dict[self.current_run_id]['prompt_template'] = serialized["kwargs"]["prompt"]['kwargs']['template']
-        if "kwargs" in serialized['kwargs']['llm']:
-            model_kwargs = serialized['kwargs']['llm']['kwargs']
-            chain_model_kwargs = {}
+        if "kwargs" in serialized:
+            self.input_dict[self.current_run_id]['prompt_template'] = serialized["kwargs"]["prompt"]['kwargs']['template']
+        elif "repr" in serialized:
+            prompt_template = self.get_prompt_template_from_repr(serialized['repr'])
+            self.input_dict[self.current_run_id]['prompt_template'] = prompt_template
         else:
-            chain_model_kwargs = self.extract_repr(serialized['kwargs']['llm']['repr'])
+            print("unknown location for prompt template")
+            prompt_template = ""
+        if "kwargs" in serialized and "llm" in serialized['kwargs']:
+            if "kwargs" in serialized['kwargs']['llm']:
+                model_kwargs = serialized['kwargs']['llm']['kwargs']
+                chain_model_kwargs = {}
+            else:
+                chain_model_kwargs = self.extract_repr(serialized['kwargs']['llm']['repr'])
+                model_kwargs = ast.literal_eval(chain_model_kwargs['model_kwargs'])
+            self.input_dict_additional_info[self.current_run_id]['prompt_type'] = ".".join(serialized["kwargs"]["prompt"]['id'])
+            self.input_dict_additional_info[self.current_run_id]['prompt_langchain_type'] = serialized["kwargs"]["prompt"]['type']
+            
+            # self.input_dict_additional_info[self.current_run_id]['memory_type'] = ".".join(serialized["kwargs"]["memory"]['id'])
+            # self.input_dict_additional_info[self.current_run_id]['memory_langchain_type'] = serialized["kwargs"]["memory"]['type']
+            self.input_dict_additional_info[self.current_run_id]['llm_type'] = ".".join(serialized["kwargs"]["llm"]['id'])
+            self.input_dict_additional_info[self.current_run_id]['llm_langchain_type'] = serialized["kwargs"]["llm"]['type']
+            
+        elif "repr" in serialized:
+            chain_model_kwargs = self.extract_repr(serialized['repr'])
             model_kwargs = ast.literal_eval(chain_model_kwargs['model_kwargs'])
 
-
-        self.input_dict_additional_info[self.current_run_id]['prompt_type'] = ".".join(serialized["kwargs"]["prompt"]['id'])
-        self.input_dict_additional_info[self.current_run_id]['prompt_langchain_type'] = serialized["kwargs"]["prompt"]['type']
-        
-        # self.input_dict_additional_info[self.current_run_id]['memory_type'] = ".".join(serialized["kwargs"]["memory"]['id'])
-        # self.input_dict_additional_info[self.current_run_id]['memory_langchain_type'] = serialized["kwargs"]["memory"]['type']
-        self.input_dict_additional_info[self.current_run_id]['llm_type'] = ".".join(serialized["kwargs"]["llm"]['id'])
-        self.input_dict_additional_info[self.current_run_id]['llm_langchain_type'] = serialized["kwargs"]["llm"]['type']
-        
+        else:
+            print("could not retrieve chain model kwargs")
 
         self.input_dict[self.current_run_id] = {**self.input_dict[self.current_run_id], **chain_model_kwargs, **model_kwargs,
                     "error": "False"}
